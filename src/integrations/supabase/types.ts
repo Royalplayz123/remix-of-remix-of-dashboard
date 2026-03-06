@@ -14,16 +14,260 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      coupon_claims: {
+        Row: {
+          claimed_at: string
+          coupon_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          coupon_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          claimed_at?: string
+          coupon_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_claims_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupons: {
+        Row: {
+          active: boolean
+          code: string
+          coins_reward: number
+          cpu_reward: number
+          created_at: string
+          current_uses: number
+          disk_reward: number
+          id: string
+          max_uses: number | null
+          ram_reward: number
+          slots_reward: number
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          coins_reward?: number
+          cpu_reward?: number
+          created_at?: string
+          current_uses?: number
+          disk_reward?: number
+          id?: string
+          max_uses?: number | null
+          ram_reward?: number
+          slots_reward?: number
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          coins_reward?: number
+          cpu_reward?: number
+          created_at?: string
+          current_uses?: number
+          disk_reward?: number
+          id?: string
+          max_uses?: number | null
+          ram_reward?: number
+          slots_reward?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          coins: number
+          created_at: string
+          email: string | null
+          id: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          coins?: number
+          created_at?: string
+          email?: string | null
+          id: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          coins?: number
+          created_at?: string
+          email?: string | null
+          id?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      servers: {
+        Row: {
+          cpu: number
+          created_at: string
+          disk: number
+          id: string
+          name: string
+          pterodactyl_id: string | null
+          ram: number
+          server_type: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          cpu?: number
+          created_at?: string
+          disk?: number
+          id?: string
+          name: string
+          pterodactyl_id?: string | null
+          ram?: number
+          server_type: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          cpu?: number
+          created_at?: string
+          disk?: number
+          id?: string
+          name?: string
+          pterodactyl_id?: string | null
+          ram?: number
+          server_type?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          coins_change: number
+          created_at: string
+          description: string | null
+          id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          coins_change?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          coins_change?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_resources: {
+        Row: {
+          cpu: number
+          created_at: string
+          disk: number
+          id: string
+          ram: number
+          server_slots: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cpu?: number
+          created_at?: string
+          disk?: number
+          id?: string
+          ram?: number
+          server_slots?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cpu?: number
+          created_at?: string
+          disk?: number
+          id?: string
+          ram?: number
+          server_slots?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +394,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
