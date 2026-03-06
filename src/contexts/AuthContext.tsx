@@ -24,10 +24,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Sync admin status from panel on sign-in
+      if (event === 'SIGNED_IN' && session) {
+        try {
+          await supabase.functions.invoke('pterodactyl-api', {
+            body: { action: 'sync_admin_status' },
+          });
+        } catch (err) {
+          console.warn('Panel admin sync failed:', err);
+        }
+      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
