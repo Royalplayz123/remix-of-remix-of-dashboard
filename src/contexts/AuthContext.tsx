@@ -24,40 +24,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
 
-      // On sign-in, register on panel if needed and sync admin status
+      // Fire-and-forget panel sync on sign-in (no await to prevent deadlocks)
       if (event === 'SIGNED_IN' && session) {
-        try {
-          // Check if user already has a pterodactyl_id
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('pterodactyl_id')
-            .eq('id', session.user.id)
-            .maybeSingle();
+        setTimeout(async () => {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('pterodactyl_id')
+              .eq('id', session.user.id)
+              .maybeSingle();
 
-          if (!profile?.pterodactyl_id) {
-            // Register on panel for new users (including OAuth)
-            await supabase.functions.invoke('pterodactyl-api', {
-              body: {
-                action: 'register_panel_user',
-                email: session.user.email,
-                username: session.user.email?.split('@')[0],
-                password: crypto.randomUUID(), // random password for OAuth users
-              },
-            });
+            if (!profile?.pterodactyl_id) {
+              await supabase.functions.invoke('pterodactyl-api', {
+                body: {
+                  action: 'register_panel_user',
+                  email: session.user.email,
+                  username: session.user.email?.split('@')[0],
+                  password: crypto.randomUUID(),
+                },
+              });
+            }
+          } catch (err) {
+            console.warn('Panel registration failed:', err);
           }
 
-          // Always sync admin status
-          await supabase.functions.invoke('pterodactyl-api', {
-            body: { action: 'sync_admin_status' },
-          });
-        } catch (err) {
-          console.warn('Panel sync failed:', err);
-        }
+          try {
+            await supabase.functions.invoke('pterodactyl-api', {
+              body: { action: 'sync_admin_status' },
+            });
+          } catch (err) {
+            console.warn('Admin sync failed:', err);
+          }
+        }, 0);
       }
     });
 
