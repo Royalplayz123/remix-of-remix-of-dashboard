@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
@@ -22,6 +23,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const syncWithPanel = async (currentSession: Session) => {
+    const userId = currentSession.user.id;
+
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('pterodactyl_id')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!profile?.pterodactyl_id) {
+        console.log('Registering panel user...');
+        const { data, error } = await supabase.functions.invoke('pterodactyl-api', {
+          body: {
+            action: 'register_panel_user',
+            email: currentSession.user.email,
+            username: currentSession.user.email?.split('@')[0],
+            password: crypto.randomUUID(),
+          },
+        });
+        console.log('Panel registration result:', data, error);
+      }
+    } catch (err) {
+      console.warn('Panel registration failed:', err);
+    }
+
+    try {
+      console.log('Syncing admin status...');
+      const { data, error } = await supabase.functions.invoke('pterodactyl-api', {
+        body: { action: 'sync_admin_status' },
+      });
+      console.log('Admin sync result:', data, error);
+
+      // Invalidate user_roles query so UI updates
+      queryClient.invalidateQueries({ queryKey: ['user_roles', userId] });
+    } catch (err) {
+      console.warn('Admin sync failed:', err);
+    }
+  };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -29,38 +71,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       setLoading(false);
 
-      // Fire-and-forget panel sync on sign-in (no await to prevent deadlocks)
       if (event === 'SIGNED_IN' && session) {
-        setTimeout(async () => {
-          try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('pterodactyl_id')
-              .eq('id', session.user.id)
-              .maybeSingle();
-
-            if (!profile?.pterodactyl_id) {
-              await supabase.functions.invoke('pterodactyl-api', {
-                body: {
-                  action: 'register_panel_user',
-                  email: session.user.email,
-                  username: session.user.email?.split('@')[0],
-                  password: crypto.randomUUID(),
-                },
-              });
-            }
-          } catch (err) {
-            console.warn('Panel registration failed:', err);
-          }
-
-          try {
-            await supabase.functions.invoke('pterodactyl-api', {
-              body: { action: 'sync_admin_status' },
-            });
-          } catch (err) {
-            console.warn('Admin sync failed:', err);
-          }
-        }, 0);
+        setTimeout(() => syncWithPanel(session), 0);
       }
     });
 
@@ -69,17 +81,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       setLoading(false);
 
-      // Sync admin status on session restore (not just sign-in)
       if (session) {
-        setTimeout(async () => {
-          try {
-            await supabase.functions.invoke('pterodactyl-api', {
-              body: { action: 'sync_admin_status' },
-            });
-          } catch (err) {
-            console.warn('Admin sync on restore failed:', err);
-          }
-        }, 0);
+        setTimeout(() => syncWithPanel(session), 0);
       }
     });
 
@@ -87,7 +90,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
-    // Clear state first to ensure UI updates immediately
     setSession(null);
     setUser(null);
     try {
