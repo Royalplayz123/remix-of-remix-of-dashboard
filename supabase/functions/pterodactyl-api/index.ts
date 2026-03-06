@@ -247,6 +247,102 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ===== AUTH SYNC ACTIONS =====
+      case "register_panel_user": {
+        const { email: regEmail, username: regUsername, password: regPassword } = params as any;
+        // Create user on Pterodactyl panel
+        const newUser = await pteroFetch("/users", {
+          method: "POST",
+          body: JSON.stringify({
+            username: regUsername || regEmail.split("@")[0],
+            email: regEmail,
+            first_name: regUsername || regEmail.split("@")[0],
+            last_name: "User",
+            password: regPassword,
+          }),
+        });
+        const pteroUserId = newUser?.attributes?.id;
+        if (pteroUserId) {
+          // Save pterodactyl_id to profile
+          const adminClient = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+          );
+          await adminClient
+            .from("profiles")
+            .update({ pterodactyl_id: pteroUserId })
+            .eq("id", userId);
+        }
+        result = { success: true, pterodactyl_id: pteroUserId };
+        break;
+      }
+
+      case "sync_admin_status": {
+        // Look up user by email on the Pterodactyl panel
+        const adminClient2 = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+        );
+        const { data: profile } = await adminClient2
+          .from("profiles")
+          .select("email, pterodactyl_id")
+          .eq("id", userId)
+          .single();
+
+        if (!profile?.email) {
+          result = { is_admin: false };
+          break;
+        }
+
+        // Find user on panel by email
+        let panelUser: any = null;
+        if (profile.pterodactyl_id) {
+          try {
+            const userData = await pteroFetch(`/users/${profile.pterodactyl_id}`);
+            panelUser = userData?.attributes;
+          } catch { /* user might not exist */ }
+        }
+        if (!panelUser) {
+          // Search by email
+          const searchData = await pteroFetch(`/users?filter[email]=${encodeURIComponent(profile.email)}`);
+          panelUser = searchData?.data?.[0]?.attributes;
+          // Update pterodactyl_id if found
+          if (panelUser?.id) {
+            await adminClient2
+              .from("profiles")
+              .update({ pterodactyl_id: panelUser.id })
+              .eq("id", userId);
+          }
+        }
+
+        const isAdmin = panelUser?.root_admin === true;
+
+        if (isAdmin) {
+          // Add admin role if not exists
+          const { data: existingRole } = await adminClient2
+            .from("user_roles")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("role", "admin")
+            .maybeSingle();
+          if (!existingRole) {
+            await adminClient2
+              .from("user_roles")
+              .insert({ user_id: userId, role: "admin" });
+          }
+        } else {
+          // Remove admin role if user is no longer admin on panel
+          await adminClient2
+            .from("user_roles")
+            .delete()
+            .eq("user_id", userId)
+            .eq("role", "admin");
+        }
+
+        result = { is_admin: isAdmin, pterodactyl_id: panelUser?.id || null };
+        break;
+      }
+
       // ===== POWER ACTIONS (Client API) =====
       case "server_power": {
         const { server_identifier, signal } = params as any;

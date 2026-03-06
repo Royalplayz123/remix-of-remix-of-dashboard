@@ -113,6 +113,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          pterodactyl_id: number | null
           updated_at: string
           username: string | null
         }
@@ -122,6 +123,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id: string
+          pterodactyl_id?: number | null
           updated_at?: string
           username?: string | null
         }
@@ -131,6 +133,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          pterodactyl_id?: number | null
           updated_at?: string
           username?: string | null
         }

@@ -22,6 +22,32 @@ const AuthPage = () => {
     if (user) navigate('/dashboard', { replace: true });
   }, [user, navigate]);
 
+  const syncWithPanel = async () => {
+    try {
+      // Sync admin status from Pterodactyl panel
+      await supabase.functions.invoke('pterodactyl-api', {
+        body: { action: 'sync_admin_status' },
+      });
+    } catch (err) {
+      console.warn('Panel sync failed:', err);
+    }
+  };
+
+  const registerOnPanel = async (userEmail: string, userPassword: string) => {
+    try {
+      await supabase.functions.invoke('pterodactyl-api', {
+        body: {
+          action: 'register_panel_user',
+          email: userEmail,
+          username: userEmail.split('@')[0],
+          password: userPassword,
+        },
+      });
+    } catch (err) {
+      console.warn('Panel registration failed:', err);
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -29,15 +55,23 @@ const AuthPage = () => {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await syncWithPanel();
         navigate('/dashboard');
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success('Check your email for the confirmation link!');
+        if (data.session) {
+          // Auto-confirmed: register on panel and sync
+          await registerOnPanel(email, password);
+          await syncWithPanel();
+          navigate('/dashboard');
+        } else {
+          toast.success('Check your email for the confirmation link!');
+        }
       }
     } catch (error: any) {
       toast.error(error.message);
