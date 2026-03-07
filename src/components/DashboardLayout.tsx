@@ -105,6 +105,16 @@ const DashboardLayout = () => {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 ml-auto">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleManualSync}
+              disabled={syncing}
+              title="Sync admin status from panel"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            </Button>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm">
               <Coins className="w-4 h-4 text-warning" />
               <span className="font-semibold text-foreground">{profile?.coins ?? 0}</span>
